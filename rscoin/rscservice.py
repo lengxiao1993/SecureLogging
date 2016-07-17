@@ -84,7 +84,7 @@ def package_issue(tx, ks):
     k, s = ks
     core = map(b64encode, [tx_ser, k.export()[0], s])
     data = " ".join(["xCommit", str(len(core))] + core)
-    return data
+    return data, core
 
 
 def unpackage_commit_response(response):
@@ -231,11 +231,16 @@ class RSCProtocol(LineReceiver):
         if not res:
             self.sendLine("NOTOK")
             return
-        seqInts = map(int, seqStrs)
         
-        seqMax = max(seqInts)
         
-        seq = self.factory.get_lamp_clock(seqMax)
+        if len(seqStrs) == 0:
+            # The issue transaction without seqencenumber
+            seq = self.factory.get_lamp_clock()
+        
+        else: 
+            seqInts = map(int, seqStrs)        
+            seqMax = max(seqInts)
+            seq = self.factory.get_lamp_clock(seqMax)
         
         logEntry = RSCLogEntry(data, "Commit_Success", lampClock = seq)
         
@@ -293,7 +298,7 @@ class RSCProtocol(LineReceiver):
 
 class RSCFactory(protocol.Factory):
 
-    _sync = False
+    _sync = True
 
     def __init__(self, secret, directory, special_key, conf_dir=None, N=3):
         """ Initialize the RSCoin server"""
@@ -315,9 +320,12 @@ class RSCFactory(protocol.Factory):
             self.dbname = join(conf_dir, self.dbname)
             self.logname = join(conf_dir, self.logname)
 
-        if RSCFactory._sync:                                ###????? is this set for synchronous writing to the disk
+        if RSCFactory._sync:                                
             self.db = dbm.open(self.dbname, 'c')
-            self.log = dbm.open(self.logname, 'c')          ### c mode means for both writing and reading, if the file does not exist, it will be created
+            self.log = dbm.open(self.logname, 'c')
+            
+            ###????? RSCFactory._sync is set for synchronous writing to the disk          
+            ### c mode means for both writing and reading, if the file does not exist, it will be created
         else:
             self.db = {} 
             self.log = {}

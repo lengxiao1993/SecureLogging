@@ -69,7 +69,6 @@ def test_authorities():
     secret = "X"*32
     factory = RSCFactory(secret, directory, None, N=3)
 
-    #??? 
     print
     print factory.get_authorities("AXXX")[-1]
     print factory.get_authorities("FXXX")[-1]
@@ -82,12 +81,7 @@ def test_TxQuery(sometx):
 
 
     tx4 = rscoin.Tx([rscoin.InputTx(tx1.id(), 0)], [rscoin.OutputTx(k1.id(), 100)])   #??? this transaction is a double spending transaction
-    
-
-    for kv, vv in tx1.get_utxo_out_entries() + tx2.get_utxo_out_entries():   #??? get_utxo_out_entries return (addrid-> (addr, v)) 
-    #??? put the tx1,pos-> k.id, value in the utxo 
-        factory.db[kv] = vv     
-
+       
     # Check the list is up to date
     for ik in tx3.get_utxo_in_keys():
         assert ik in factory.db                                       #???  this is the case because the tx3.get_utxo_in_keys maps to addrid in tx1 and tx2
@@ -101,7 +95,8 @@ def test_TxQuery(sometx):
     assert factory.key.id() in factory.get_authorities(tx1.id())       #?? the txx1 is within the current transaction remit.  
     assert factory.process_TxQuery(data)   
 
-    for ik in tx3.get_utxo_in_keys():                            #??? get_utxo_in_keys returns addrid of the input in a transaction
+    # Check the unspent items are already removed from utxo list
+    for ik in tx3.get_utxo_in_keys():
         assert ik not in factory.db
 
     ## A transaction should be indepotent
@@ -120,7 +115,7 @@ def test_TxQuery_serialize(sometx):
     for ik in tx3.get_utxo_in_keys():
         assert ik in factory.db
 
-    H, data, _ = package_query(tx3, [tx1, tx2], [k1, k2]) 
+    H, data, dataCore = package_query(tx3, [tx1, tx2], [k1, k2]) 
     #??? H is hash digest of quired data
     #... where data is serialized (mainTx, otherTx, keys, sigs)
 
@@ -129,11 +124,15 @@ def test_TxQuery_serialize(sometx):
     #??? tr is a StringTransport
     #??? handle_Query will return ("OK %s" % self.sign(H))
     #... Notice here the self.sgin is the factory.sign not key.sign
-    _, k, s = unpackage_query_response(response)
+    _, k, s, hashhead, seqStr = unpackage_query_response(response)
     
+    new_H = sha256(" ".join(  dataCore
+                            + [hashhead] 
+                            + [seqStr])
+                   ).digest()
     #... notice in sometx, there is only one factory playing mintette
     #... factory.key.pub.export( EcPt.POINT_CONVERSION_UNCOMPRESSED ) == k  
-    assert factory.key.verify(H, s)
+    assert factory.key.verify(new_H, s)
         
 def test_TxCommit(sometx):
     (factory, instance, tr), (k1, k2, tx1, tx2, tx3) = sometx
@@ -148,29 +147,41 @@ def test_TxCommit(sometx):
     #H = sha256(" ".join(data1)).digest()
 
     #data = " ".join(["Query", str(len(data1))] + data1)
-    H, data, dataCore = package_query(tx3, [tx1, tx2], [k1, k2])
+    H, dataString, dataCoreList = package_query(tx3, [tx1, tx2], [k1, k2])
 
-    instance.lineReceived(data)
+    instance.lineReceived(dataString)
     response = tr.value()
     
-    k, s = map(b64decode, response.split(" ")[1:])
+    _, k, s, hashhead, seqStr = unpackage_query_response(response)
+    
+    new_H = sha256(" ".join(  dataCoreList
+                            + [hashhead] 
+                            + [seqStr])
+                   ).digest()
+                   
     k2 = rscoin.Key(k)
-    assert factory.key.verify(H, s)
-    assert k2.verify(H, s)
+    assert factory.key.verify(new_H, s)
+    assert k2.verify(new_H, s)
 
     ## Now we test the Commit
     tr.clear()
     # data = " ".join(["Commit", str(len(dataCore))] + dataCore + map(b64encode, [k, s]))
 
-    data = package_commit(dataCore, [(k, s)])
-    instance.lineReceived(data)
+    dataString2 = package_commit(dataCoreList, [(k, s, hashhead, seqStr)])
+    instance.lineReceived(dataString2)
+    response = tr.value() 
     
-    flag, pub, sig = tr.value().split(" ")
-    assert factory.key.verify(tx3.id(), b64decode(sig))
+    flag, pub, sig, hashhead, seqStr = unpackage_commit_response(response)
+    new_h = sha256(" ".join(dataCoreList
+                            + [hashhead] 
+                            +[seqStr])).digest()
+                            
+    
+    assert factory.key.verify(new_h, sig)
 
-    k3 = rscoin.Key(b64decode(pub))
-    assert k3.verify(tx3.id(), b64decode(sig))
-    
+    k3 = rscoin.Key(pub)
+    assert k3.verify(new_h, sig)
+        
     
 def test_TxCommit_Issued(sometx):
     (factory, instance, tr), (k1, k2, tx1, tx2, tx3) = sometx
@@ -195,18 +206,23 @@ def test_TxCommit_Issued(sometx):
     # Send message
     tr.clear()
 
-    data = package_issue(tx3, [kIssue, sig1])
+    data, dataCoreList= package_issue(tx3, [kIssue, sig1])
 
     instance.lineReceived(data)
-
+    response = tr.value()
+    
     # Ensure the returned signatures check
-    ret, pub, sig = tr.value().split(" ")
-    assert ret == "OK"
-    kx = rscoin.Key(b64decode(pub))
-    assert kx.verify(tx3.id(), b64decode(sig))
+    flag, pub, sig, hashhead, seqStr = unpackage_commit_response(response)
+    assert flag == "OK"
+    kx = rscoin.Key(pub)
+    
+    new_h = sha256(" ".join(dataCoreList
+                            + [hashhead] 
+                            +[seqStr])).digest()
+    assert kx.verify(new_h, sig)
 
     # Ensure the entries are now in
-    for k, v in tx3.get_utxo_out_entries():
+    for k, v in tx3.get_utxo_out_entries(): 
         assert factory.db[k] == v
 
 def test_Ping(sometx):
@@ -357,11 +373,11 @@ def test_multiple():
 
         assert kid == f.key.id()
         if resp_msg[0] == "OK":
-            [r, s] = resp_msg[1:]
+            [pub, sig, hashhead, seqStr] = resp_msg[1:]
 
             total += 1
             xset += [ f.key.id() ]
-            rss += [(r,s)]
+            rss += [(pub, sig, hashhead, seqStr)]
         else:
             pass
             
@@ -468,12 +484,13 @@ def test_full_client(msg_mass):
     t0 = timer()
     for (tx, data, core, response) in responses:
         resp = response.split(" ")
-        k, s = map(b64decode, resp[1:])
+        pub, sig, hashhead, seqStr = map(b64decode, resp[1:])
         assert resp[0] == "OK"
         tr.clear()
-        data = package_commit(core, [(k, s)])
+        data = package_commit(core, [(pub, sig, hashhead, seqStr)])
         instance.lineReceived(data)
-        flag, pub, sig = tr.value().split(" ")
+        response = tr.value()
+        flag, pub, sig, hashhead, seqStr = unpackage_commit_response(response)
         assert flag == "OK"
     t1 = timer()
     print "\nCommit message rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(responses))))

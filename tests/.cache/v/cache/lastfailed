@@ -1,1 +1,3 @@
-{}
+{
+  "test_rscservice.py::test_full_client": true
+}

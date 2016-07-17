@@ -175,7 +175,7 @@ def test_hash_head(sometx):
     
     assert tmpHashhead == factory.get_hash_head()
 
-def test_TxQuery_signature(sometx):
+def test_TxQuery_serialize(sometx):
     (factory, instance, tr), (k1, k2, tx1, tx2, tx3) = sometx
 
     # Check the list is up to date
