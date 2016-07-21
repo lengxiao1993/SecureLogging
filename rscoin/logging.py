@@ -256,7 +256,7 @@ def decode_jason_to_log_entry(jason_dict):
 
 class RSCLogger:
     def __init__(self, ip = "localhost", port=27017):
-        self.client = MongoClient(ip,port, j = True)
+        self.client = MongoClient(ip,port)
         self.db = self.client.RSC_Log_Database
         self.collection = self.db.log_collection
 

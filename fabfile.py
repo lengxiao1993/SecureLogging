@@ -72,6 +72,16 @@ def ec2start():
             KeyName='MyKeyPair',
             MinCount=missing, 
             MaxCount=missing )
+        
+@runs_once
+def ec2restart():
+    instances = ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['stopped']}])
+    ids = [i.id for i in instances]
+    try:
+        ec2.instances.filter(InstanceIds=ids).start()
+        #ec2.instances.filter(InstanceIds=ids).terminate()
+    except Exception as e:
+        print e         
 
 @runs_once
 def ec2list():
@@ -86,7 +96,7 @@ def ec2stop():
     ids = [i.id for i in instances]
     try:
         ec2.instances.filter(InstanceIds=ids).stop()
-        ec2.instances.filter(InstanceIds=ids).terminate()
+        #ec2.instances.filter(InstanceIds=ids).terminate()
     except Exception as e:
         print e
 
@@ -212,16 +222,22 @@ def passcache():
     # Delete old folder and make a new one
     sudo( 'rm -rf /home/ubuntu/projects/rscoin')
     run( 'mkdir -p /home/ubuntu/projects/rscoin')
-    sudo( 'apt-get update')
+    #sudo( 'apt-get update')
     sudo("apt-get install -y sysbench")
     sudo("apt-get install -y python-pip")
     sudo("apt-get install -y python-dev libssl-dev libffi-dev")
     sudo("apt-get install -y git")
-
-
+    
+    #Install mongodb
+    sudo("apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv EA312927")
+    sudo("echo \"deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list")
+    sudo( "apt-get update ")
+    sudo("apt-get install -y mongodb-org")
+    sudo("sudo service mongod start")
+    
     with cd('/home/ubuntu/projects'):
         sudo('pip install petlib --upgrade')
-        run("git clone https://github.com/gdanezis/rscoin.git")
+        run("git clone git@github.com:lengxiao1993/SecureLogging.git")
 
 @runs_once
 def init():
@@ -248,6 +264,19 @@ def deploy():
 def experiment1():
     env.messages = 2000
     env.expname = "experiment1"
+    
+    
+
+    with settings(warn_only=True):            
+        execute(clean)
+    
+    if "rsdir" in env:
+        del env["rsdir"]
+        
+    execute(keys)
+    execute(loaddir)
+    execute(loadsecret)
+        
     local( "rm -rf experiment1" )
     local( "mkdir experiment1" )
     execute( "experiment1run" )
@@ -352,6 +381,7 @@ def experiment3():
         
         if "rsdir" in env:
             del env["rsdir"]
+            
         execute(keys)
         execute(loaddir)
         execute(loadsecret)

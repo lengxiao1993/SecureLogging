@@ -209,8 +209,8 @@ def play(core, directory):
                         d_end.errback(Exception("Query failed."))
                         return
 
-                    _, k, s = res
-                    kss += [(k, s)]
+                    _, k, s, hashhead, seqStr = res
+                    kss += [(k, s, hashhead, seqStr)]
 
 
                 commit_message = package_commit(core, kss)
@@ -311,8 +311,9 @@ def main():
                 d = play(c, directory)
                 d.addCallback(play_another_song)
 
-                def replay():
+                def replay(failure):
                     cores += [ c ]
+                    print str(failure)
 
                 d.addErrback(replay)
                 d.addErrback(play_another_song)

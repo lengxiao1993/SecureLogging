@@ -323,14 +323,15 @@ class RSCFactory(protocol.Factory):
         if RSCFactory._sync:                                
             self.db = dbm.open(self.dbname, 'c')
             self.log = dbm.open(self.logname, 'c')
-            
+            self.log["hashhead"] = ""
+            self.log["lampClock"] = "0"
             ###????? RSCFactory._sync is set for synchronous writing to the disk          
             ### c mode means for both writing and reading, if the file does not exist, it will be created
         else:
             self.db = {} 
             self.log = {}
             self.log["hashhead"] = ""
-            self.log["lampClock"] = 0
+            self.log["lampClock"] = "0"
     
     def buildProtocol(self, addr):
         cli = RSCProtocol(self)
@@ -486,15 +487,16 @@ class RSCFactory(protocol.Factory):
         
         return self.log["hashhead"]
     
-    def get_lamp_clock(self, receivedClcok = None):
+    def get_lamp_clock(self, receivedClock = None):
         
-        localClock = self.log["lampClock"]
-        if(receivedClcok == None or receivedClcok < receivedClcok):
-            self.log["lampClock"] = localClock + 1
-            return self.log["lampClock"]
+        localClock = int(self.log["lampClock"])
+        
+        if(receivedClock == None or receivedClock < localClock):
+            self.log["lampClock"] = str(localClock + 1)
+            return int(self.log["lampClock"])
         else:
-            self.log["lampClock"] = receivedClcok + 1
-            return self.log["lampClock"]
+            self.log["lampClock"] = str(receivedClock + 1)
+            return int(self.log["lampClock"])
     
     
 
