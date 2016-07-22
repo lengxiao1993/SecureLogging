@@ -142,58 +142,58 @@ class RSCLogEntry:
             
             
             
-def encode_log_entry_to_jason(logEntry):
+def encode_log_entry_to_json(logEntry):
     """ Transform the log entry to jason format dict to store into MongoDB """
      
     
     if logEntry.action == "Query_Success" or "Commit_Success":
         # Common fileds for query and commit log entry
-        jason_dict= {"date": logEntry.utcTimestamp,
+        json_dict= {"date": logEntry.utcTimestamp,
                       "action": logEntry.action,
                       "lampClock": logEntry.lampClock,
                       "processedTxId": b64encode(logEntry.processedTx.id()),
                       }
         
         inputAddrKeys = [ b64encode(key) for key in logEntry.inputAddrKeys ]
-        jason_dict.update({"inputAddrKeys" : inputAddrKeys})       
+        json_dict.update({"inputAddrKeys" : inputAddrKeys})       
         
         inputSigs = [ b64encode(sig) for sig in logEntry.inputSigs]
-        jason_dict.update({"inputSigs" : inputSigs})
+        json_dict.update({"inputSigs" : inputSigs})
         
         
         inputAddrIds = [{"tx_id": b64encode(addrId.tx_id),
                         "pos" : addrId.pos
                         } for addrId in logEntry.processedTx.inTx]
           
-        jason_dict.update({"inputAddrIds": inputAddrIds})
+        json_dict.update({"inputAddrIds": inputAddrIds})
         
         outputAddrIds = [{"key_id" : b64encode(outAddrId.key_id),
                          "value": outAddrId.value
                          } for outAddrId in logEntry.processedTx.outTx  ]
         
-        jason_dict.update({"outputAddrIds": outputAddrIds})
+        json_dict.update({"outputAddrIds": outputAddrIds})
         
         inputTxs = [b64encode(tx) for tx in logEntry.parentTx]
         
-        jason_dict.update({"inputTxs": inputTxs})
+        json_dict.update({"inputTxs": inputTxs})
         
-        jason_dict.update({"processedTx_R": b64encode(logEntry.processedTx.R)})
+        json_dict.update({"processedTx_R": b64encode(logEntry.processedTx.R)})
     
     if logEntry.action == "Commit_Success":
         authKeys = [ b64encode(key) for key in logEntry.authKeys ]
-        jason_dict.update({"authKeys" : authKeys})       
+        json_dict.update({"authKeys" : authKeys})       
         
         authSigs = [ b64encode(sig) for sig in logEntry.authSigs ]
-        jason_dict.update({"authSigs" : authSigs})
+        json_dict.update({"authSigs" : authSigs})
         
         hashheads = [ b64encode(head) for head in logEntry.hashheads ]
-        jason_dict.update({"hashheads" : hashheads})
+        json_dict.update({"hashheads" : hashheads})
     
     
-    return jason_dict
+    return json_dict
 
 
-def decode_jason_to_log_entry(jason_dict):
+def decode_json_to_log_entry(jason_dict):
     
     
     logEntry = RSCLogEntry()
@@ -262,7 +262,7 @@ class RSCLogger:
 
     
     def write_log(self, logEntry):
-        """   jason_entry = {"date": logEntry.utcTimestamp,
+        """   json_entry = {"date": logEntry.utcTimestamp,
                        "action" : "Query",
                        "processedTxId": b64encode(logEntry.processedTx.id()),
                        
@@ -286,30 +286,30 @@ class RSCLogger:
                        }
                        576c4e2f1d41c8afafec1f91
         """ 
-        jason_entry = encode_log_entry_to_jason(logEntry)             
-        self.collection.insert(jason_entry)
+        json_entry = encode_log_entry_to_json(logEntry)             
+        self.collection.insert(json_entry)
         
     def query_log_by_time(self, timestamp):
-        jason_entry = self.collection.find_one({"date":timestamp})
+        json_entry = self.collection.find_one({"date":timestamp})
         
-        return jason_entry
+        return json_entry
     def query_log_by_processedTxId(self, processedTxId):
-        jason_entry = self.collection.find_one({"processedTxId":
+        json_entry = self.collection.find_one({"processedTxId":
                                                  b64encode(processedTxId)})
         
-        return jason_entry
+        return json_entry
     def query_log_by_sequenceNum(self, seq ):
-        jason_entry = self.collection.find_one({"lampClock": seq})
-        return jason_entry
+        json_entry = self.collection.find_one({"lampClock": seq})
+        return json_entry
     
     def query_log_by(self, processedTxId, action):
         
-        jason_entry = self.collection.find_one({"processedTxId": 
+        json_entry = self.collection.find_one({"processedTxId": 
                                                 b64encode(processedTxId),
                                                 "action":action
                                                 
                                                 })
-        return jason_entry
+        return json_entry
     
         
             

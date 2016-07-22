@@ -102,7 +102,7 @@ def ec2stop():
 
 @roles("servers")
 def time():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         x = run('py.test-2.7 -s -k "full_client"') + "\n\n"
         x += run('py.test-2.7 -s -k "timing"')
         
@@ -135,13 +135,13 @@ def null():
 
 @roles("servers","clients")
 def gitpull():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run('git pull')
 
 @roles("servers", "clients")
 @parallel
 def gitall():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run('git pull')
 
 
@@ -152,21 +152,28 @@ def host_type():
 @roles("servers")
 @parallel
 def start():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         # run('export PYTHONOPTIMIZE=1; twistd -y rscserver.tac.py')
         run('twistd -y rscserver.tac.py')
 
 @roles("servers")
 @parallel
 def clean():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run('rm -rf experiment*')
         run('rm keys-*')
+        
+@roles("servers")
+@parallel
+def check():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        result = run('ls')
+        print result
 
 @roles("servers", "clients")
 @parallel
 def stop():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         with settings(warn_only=True):
             
             try:
@@ -190,7 +197,7 @@ def keys():
         env["rsdir"] = {"special": pid, "directory": []}
 
     [_, host] = env.host_string.split("@")
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run('touch secret.key')
         run('rm secret.key')
         result = run('python derivekey.py --store')
@@ -206,13 +213,13 @@ def keys():
 @roles("servers","clients")
 @parallel
 def loaddir():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         put('directory.conf', 'directory.conf')
 
 @roles("clients")
 @parallel
 def loadsecret():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         put('secret.key', 'secret.key')
 
 
@@ -220,8 +227,8 @@ def loadsecret():
 @parallel
 def passcache():
     # Delete old folder and make a new one
-    sudo( 'rm -rf /home/ubuntu/projects/rscoin')
-    run( 'mkdir -p /home/ubuntu/projects/rscoin')
+    sudo( 'rm -rf /home/ubuntu/projects/SecureLogging')
+    run( 'mkdir -p /home/ubuntu/projects/SecureLogging')
     #sudo( 'apt-get update')
     sudo("apt-get install -y sysbench")
     sudo("apt-get install -y python-pip")
@@ -233,11 +240,12 @@ def passcache():
     sudo("echo \"deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list")
     sudo( "apt-get update ")
     sudo("apt-get install -y mongodb-org")
-    sudo("sudo service mongod start")
+    sudo("sudo service mongod restart")
     
     with cd('/home/ubuntu/projects'):
         sudo('pip install petlib --upgrade')
-        run("git clone git@github.com:lengxiao1993/SecureLogging.git")
+        sudo('pip install pymongo')
+        run("git clone https://github.com/lengxiao1993/SecureLogging.git")
 
 @runs_once
 def init():
@@ -246,7 +254,7 @@ def init():
     execute(passcache)
 
 def runcollect():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run("collectl -f LOGFILE -D")
         num = run("ps -A | grep collect")
         print re.findall("[0-9]+", num)[0]
@@ -294,7 +302,7 @@ def experiment1run():
     # local('sudo sysctl -w net.ipv4.ip_local_port_range="500   65535"')
     # local("sudo echo 20000500 > /proc/sys/fs/nr_open")
     # local('sudo sh -c "ulimit -n 1048576"')
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run("python simscript.py %s payments.txt" % env.messages)
         run("rm -rf %s" % env.expname)
         run("mkdir %s" % env.expname)
@@ -304,33 +312,33 @@ def experiment1run():
 @roles("clients")
 @parallel
 def experiment1pre():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run("./rsc.py --play payments.txt-r1 --conn 30 > %s/r1-times.txt" % env.expname)
 
 
 @roles("clients")
 @parallel
 def experiment1actual():
-    with cd('/home/ubuntu/projects/rscoin'):
+    with cd('/home/ubuntu/projects/SecureLogging'):
         run("./rsc.py --play payments.txt-r2 > %s/r2-times.txt" % env.expname)
 
 
 @roles("clients")
 def experiment1collect():        
         # run("ls experiment1/*")
-    with cd('/home/ubuntu/projects/rscoin/%s' % env.expname):
+    with cd('/home/ubuntu/projects/SecureLogging/%s' % env.expname):
         get('issue-times.txt', '%s/%s-issue-times.txt' % (env.expname, env.host))
 
     with lcd(env.expname):
         local("cat %s-issue-times.txt >> issue-times.txt" % env.host)
 
-    with cd('/home/ubuntu/projects/rscoin/%s' % env.expname):
+    with cd('/home/ubuntu/projects/SecureLogging/%s' % env.expname):
         get('r1-times.txt', '%s/%s-r1-times.txt' % (env.expname, env.host))
     
     with lcd(env.expname):
         local("cat %s-r1-times.txt >> r1-times.txt" % env.host)
 
-    with cd('/home/ubuntu/projects/rscoin/%s' % env.expname):
+    with cd('/home/ubuntu/projects/SecureLogging/%s' % env.expname):
         get('r2-times.txt', '%s/%s-r2-times.txt' % (env.expname, env.host))
 
     with lcd(env.expname):

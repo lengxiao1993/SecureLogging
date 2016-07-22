@@ -15,8 +15,8 @@ from rscoin.rscservice import package_query, unpackage_query_response, \
                         package_commit, package_issue, unpackage_commit_response, \
                         RSCProtocol
 from tests.test_rscservice import sometx
-from rscoin.logging import RSCLogEntry, RSCLogger, decode_jason_to_log_entry, \
-                           encode_log_entry_to_jason
+from rscoin.logging import RSCLogEntry, RSCLogger, decode_json_to_log_entry, \
+                           encode_log_entry_to_json
 from py._path.svnwc import LogEntry
                         
 
@@ -43,7 +43,7 @@ def test_QueryLogEntry_serialize(sometx):
     #jasonString = logger.query_log(logEntry.utcTimestamp)
     jasonString = logger.query_log_by_processedTxId(logEntry.processedTx.id())
     
-    logEntry2 = decode_jason_to_log_entry(jasonString)
+    logEntry2 = decode_json_to_log_entry(jasonString)
     
     assert logEntry.parentTx == logEntry2.parentTx
     assert logEntry.processedTx.id() == logEntry2.processedTx.id()
@@ -120,7 +120,7 @@ def test_CommitLogEntry_serialize(sometx):
     
     
     jasonString = logger.query_log_by(logEntry.processedTx.id(), logEntry.action)  
-    logEntry2 = decode_jason_to_log_entry(jasonString)
+    logEntry2 = decode_json_to_log_entry(jasonString)
     
     
         
