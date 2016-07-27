@@ -14,12 +14,12 @@ from rscoin.rscservice import RSCFactory, load_setup, get_authorities
 from rscoin.rscservice import package_query, unpackage_query_response, \
                         package_commit, package_issue, unpackage_commit_response, \
                         RSCProtocol
-from tests.test_rscservice import sometx
+from tests.test_rscservice import sometx, msg_mass
 from rscoin.logging import RSCLogEntry, RSCLogger, decode_json_to_log_entry, \
                            encode_log_entry_to_json
 from py._path.svnwc import LogEntry
                         
-
+from petlib.ec import EcPt
 def test_QueryLogEntry_serialize(sometx):
     (factory, instance, tr), (k1, k2, tx1, tx2, tx3) = sometx
 
@@ -268,6 +268,53 @@ def test_TxCommit(sometx):
     k3 = rscoin.Key(pub)
     assert k3.verify(new_h, sig)
     
+    
+def test_log_verify(msg_mass):
+    (sometx, mesages_q) = msg_mass
+    (factory, instance, tr) = sometx
+
+    responses = []
+    t0 = timer()
+    for (tx, data, core) in mesages_q:
+        tr.clear()
+        instance.lineReceived(data)
+        response = tr.value()
+        responses += [(tx, data, core, response)]
+    t1 = timer()
+    print "\nQuery message rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(mesages_q))))
+
+    ## Now we test the Commit
+    t0 = timer()
+    for (tx, data, core, response) in responses:
+        resp = response.split(" ")
+        pub, sig, hashhead, seqStr = map(b64decode, resp[1:])
+        assert resp[0] == "OK"
+        tr.clear()
+        data = package_commit(core, [(pub, sig, hashhead, seqStr)])
+        instance.lineReceived(data)
+        response = tr.value()
+        flag, pub, sig, hashhead, seqStr = unpackage_commit_response(response)
+        assert flag == "OK"
+    t1 = timer()
+    print "\nCommit message rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(responses))))
+    
+    ## log verification test
+    t0 = timer()
+    logger = RSCLogger()
+    last_queried_tx, data, core = mesages_q[-1]
+    authPub = factory.key.pub.export(EcPt.POINT_CONVERSION_UNCOMPRESSED)
+    quired_hashhead = logger.query_hashhead(last_queried_tx.id(), authPub, 
+                                            seq= len(mesages_q)*2 )
+    
+    assert quired_hashhead !=None
+    assert logger.verify_log(len(mesages_q), quired_hashhead) == True
+    assert logger.verify_log(int(seqStr), hashhead) == True
+    t1 = timer()
+    
+    print "\nLog verification rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(responses))))
+    
+def test_query_then_verify():
+    logger = RSCLogger()
     
     
     

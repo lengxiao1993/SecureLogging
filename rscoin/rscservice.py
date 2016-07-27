@@ -169,7 +169,8 @@ class RSCProtocol(LineReceiver):
         
         logEntry = RSCLogEntry(data, "Query_Success", lampClock = seq)
         
-        newHashHead = sha256(logEntry.serialize()
+        newHashHead = sha256(
+                             logEntry.serialize()
                              +
                              self.factory.get_hash_head()
                              ).digest()
@@ -298,7 +299,7 @@ class RSCProtocol(LineReceiver):
 
 class RSCFactory(protocol.Factory):
 
-    _sync = True
+    _sync = False
 
     def __init__(self, secret, directory, special_key, conf_dir=None, N=3):
         """ Initialize the RSCoin server"""
