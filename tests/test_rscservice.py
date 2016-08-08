@@ -440,7 +440,7 @@ def msg_mass():
 
     all_tx = []
 
-    for _ in range(3):
+    for _ in range(2000):
 
         tx1 = rscoin.Tx([], [rscoin.OutputTx(k1.id(), 100)]) 
         tx2 = rscoin.Tx([], [rscoin.OutputTx(k2.id(), 150)])

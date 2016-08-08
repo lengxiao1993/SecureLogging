@@ -10,16 +10,19 @@ from traceback import print_stack, print_exc
 from twisted.test.proto_helpers import StringTransport
 
 import rscoin
-from rscoin.rscservice import RSCFactory, load_setup, get_authorities
+from rscoin.rscservice import RSCFactory, load_setup, get_authorities,\
+    unpackage_hash_response, package_hashQuery
 from rscoin.rscservice import package_query, unpackage_query_response, \
                         package_commit, package_issue, unpackage_commit_response, \
                         RSCProtocol
 from tests.test_rscservice import sometx, msg_mass
 from rscoin.logging import RSCLogEntry, RSCLogger, decode_json_to_log_entry, \
-                           encode_log_entry_to_json
+                           encode_log_entry_to_json, Auditor
 from py._path.svnwc import LogEntry
                         
 from petlib.ec import EcPt
+
+
 def test_QueryLogEntry_serialize(sometx):
     (factory, instance, tr), (k1, k2, tx1, tx2, tx3) = sometx
 
@@ -298,21 +301,65 @@ def test_log_verify(msg_mass):
     t1 = timer()
     print "\nCommit message rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(responses))))
     
+    
     ## log verification test
     t0 = timer()
     logger = RSCLogger()
     last_queried_tx, data, core = mesages_q[-1]
     authPub = factory.key.pub.export(EcPt.POINT_CONVERSION_UNCOMPRESSED)
-    quired_hashhead = logger.query_hashhead(last_queried_tx.id(), authPub, 
-                                            seq= len(mesages_q)*2 )
+    seq =  len(mesages_q)
     
+    quired_hashhead, sig, dataCore = logger.query_hashhead(last_queried_tx.id(), authPub, 
+                                            seq)
     assert quired_hashhead !=None
+    
+    new_h = sha256(" ".join( dataCore
+                            + [quired_hashhead] 
+                            +[str(seq)])).digest()
+    
+    assert factory.key.verify(new_h, sig)
+    
     assert logger.verify_log(len(mesages_q), quired_hashhead) == True
     assert logger.verify_log(int(seqStr), hashhead) == True
     t1 = timer()
     
+    ## test hashhead query protocol
+    data = package_hashQuery(last_queried_tx, authPub, str(seq))
+    tr.clear()
+    instance.lineReceived(data)
+    response = tr.value()
+    quired_hashhead, sig, dataCore = unpackage_hash_response(response)
+    assert quired_hashhead !=None
+    
+    new_h = sha256(" ".join( dataCore
+                            + [quired_hashhead] 
+                            +[str(seq)])).digest()
+    
+    assert factory.key.verify(new_h, sig)
+    
+    assert logger.verify_log(len(mesages_q), quired_hashhead) == True
+    assert logger.verify_log(int(seqStr), hashhead) == True
+    
     print "\nLog verification rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(responses))))
     
+    
+    ## test query by tx_id,pos
+    inTx = last_queried_tx.inTx[0]
+    tx_id = inTx.tx_id
+    pos = inTx.pos
+    logEntries = logger.query_log_by_inputAddrId(tx_id, pos)
+    assert logEntries != None
+    assert len(logEntries) == 2
+    
+    
+    ## test the auditor
+    
+    auditor = Auditor(factory.directory, factory.special_key)
+    auditor.connect_to_log_db("localhost", 27017)
+    assert auditor.audit_logEntry(logEntries[0], factory.directory[0][0])
+    assert auditor.audit_logEntry(logEntries[1], factory.directory[0][0])
+    
+       
 def test_query_then_verify():
     logger = RSCLogger()
     

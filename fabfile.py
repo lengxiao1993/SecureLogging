@@ -165,6 +165,12 @@ def clean():
         
 @roles("servers")
 @parallel
+def deleteLogs():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        run('mongo RSC_Log_Database --eval "db.log_collection.remove({})"')
+        
+@roles("servers")
+@parallel
 def check():
     with cd('/home/ubuntu/projects/SecureLogging'):
         result = run('ls')
@@ -240,13 +246,14 @@ def passcache():
     sudo("echo \"deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list")
     sudo( "apt-get update ")
     sudo("apt-get install -y mongodb-org")
+    sudo("sed -i '/bindIp/d' /etc/mongod.conf") 
     sudo("sudo service mongod restart")
     
     with cd('/home/ubuntu/projects'):
         sudo('pip install petlib --upgrade')
         sudo('pip install pymongo')
         run("git clone https://github.com/lengxiao1993/SecureLogging.git")
-
+        
 @runs_once
 def init():
     # local("grep rsa ~/.ssh/known_hosts > known_hosts")

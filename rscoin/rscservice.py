@@ -20,6 +20,7 @@ from twisted.python import log
 
 import rscoin
 from rscoin.logging import RSCLogger, RSCLogEntry
+from py._path.svnwc import LogEntry
 
 def load_setup(setup_data):
     structure = loads(setup_data)
@@ -86,6 +87,16 @@ def package_issue(tx, ks):
     data = " ".join(["xCommit", str(len(core))] + core)
     return data, core
 
+def package_hashQuery(tx, authPub, seqStr):
+    
+    items  = [tx.id()]
+    items += [authPub]
+    items += [seqStr]
+
+    dataCore = map(b64encode, items)
+    data = " ".join(["HashQuery", str(len(dataCore))] + dataCore)
+    return data
+
 
 def unpackage_commit_response(response):
     resp = response.strip().split(" ")
@@ -96,6 +107,15 @@ def unpackage_commit_response(response):
 
     return resp
 
+def unpackage_hash_response(response):
+    resp = response.strip().split(" ")
+    
+    code = resp[0]
+    if code == "OK":
+        hashhead = b64decode(resp[1])
+        sig = b64decode(resp[2])
+        dataCore = resp[3:]
+        return hashhead, sig, dataCore
 
 class RSCProtocol(LineReceiver):
 
@@ -104,8 +124,12 @@ class RSCProtocol(LineReceiver):
 
     @staticmethod
     def parse_Tx_bundle(bundle_items, items):
-        """ Common parsing code for the Tx bundle """
-
+        """ 
+        Common parsing code for the Tx bundle 
+        Notice otherTx are still in the serialized form 
+        While mainTx is deserialized
+        """
+        
         assert len(items) == bundle_items
         H = sha256(" ".join(items)).digest()
 
@@ -143,7 +167,7 @@ class RSCProtocol(LineReceiver):
             assert len(otherTx) > 0
             assert len(items[2+bundle_size:]) == 0
 
-            # TODO: checkhere this Tx falls within our remit         #???? to be added
+            # TODO: checkhere this Tx falls within our remit        
 
         except Exception as e:
             print_exc()
@@ -163,7 +187,7 @@ class RSCProtocol(LineReceiver):
             self.sendLine("NOTOK" )
             return
         
-        #... when all the checks passed, create log entry
+        #... When all the checks passed, create log entry
         
         seq = self.factory.get_lamp_clock()
         
@@ -219,7 +243,6 @@ class RSCProtocol(LineReceiver):
             
             H, data = RSCProtocol.parse_Tx_bundle( bundle_size, items)
             (mainTx, otherTx, keys, sigs) = data
-                        
         except:
             print_exc()
             self.return_Err("ParsingError")
@@ -244,7 +267,11 @@ class RSCProtocol(LineReceiver):
             seq = self.factory.get_lamp_clock(seqMax)
         
         logEntry = RSCLogEntry(data, "Commit_Success", lampClock = seq)
+        #######################
+        data2 = logEntry.get_commit_data()
+        assert data2 == data
         
+        ###########################
         newHashHead = sha256(logEntry.serialize()
                              +
                              self.factory.get_hash_head()
@@ -265,6 +292,36 @@ class RSCProtocol(LineReceiver):
                                        b64encode(str(seq)) 
                                        )
                                        )
+    def handle_hashQuery(self, items):
+        try:
+            bundle_size = int(items[1])    
+
+            items = items[2:2+bundle_size]
+            
+            # Specific checks
+            assert len(items[2+bundle_size:]) == 0
+
+
+            while len(items) > 0:
+                tx_id    = b64decode(items.pop(0)) 
+                auth_key = b64decode(items.pop(0))
+                seqStr   = b64decode(items.pop(0)) 
+            assert len(items) == 0
+                        
+        except:
+            print_exc()
+            self.return_Err("ParsingError")
+            return
+        
+        hh, sig, dataCore= self.factory.logger.query_hashhead(tx_id, 
+                                                              auth_key, 
+                                                              int(seqStr))
+        
+        self.sendLine("OK %s %s %s" % (
+                                       b64encode(hh), b64encode(sig), 
+                                       " ".join(dataCore)
+                                       )
+                      )
         
 
     def lineReceived(self, line):
@@ -280,7 +337,9 @@ class RSCProtocol(LineReceiver):
         if items[0] == "Ping":
             self.sendLine("Pong %s" % b64encode(self.factory.key.id()))
             return # self.handle_Commit(items) # Seal a transaction
-
+        if items[0] == "HashQuery":
+            return self.handle_hashQuery(items)
+        
         self.return_Err("UnknownCommand:%s" % items[0])
         return
 
@@ -418,7 +477,7 @@ class RSCFactory(protocol.Factory):
         all_good = True
         pub_set = []
         
-        # hh is hea
+        # hh is hash head, while zip set is null, this part checks is skipped
         for pub, sig, hh, s in zip(auth_pub, auth_sig, hashheads, seqStrs):
             key = rscoin.Key(pub)
             pub_set += [ key.id() ]
