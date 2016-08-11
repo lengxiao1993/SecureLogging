@@ -55,7 +55,7 @@ env.roledefs.update({
 from collections import defaultdict
 env.timings = defaultdict(list)
 
-NUM_MACHINES = 6
+NUM_MACHINES = 20
 
 @roles("servers")
 def mytask():
@@ -162,6 +162,7 @@ def clean():
     with cd('/home/ubuntu/projects/SecureLogging'):
         run('rm -rf experiment*')
         run('rm keys-*')
+        run('rm logs-*')
         
 @roles("servers")
 @parallel
@@ -175,6 +176,15 @@ def check():
     with cd('/home/ubuntu/projects/SecureLogging'):
         result = run('ls')
         print result
+        
+@roles("servers")
+@parallel
+def mongostart():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        sudo("sudo service mongod restart")
+        
+        
+
 
 @roles("servers", "clients")
 @parallel
@@ -235,7 +245,7 @@ def passcache():
     # Delete old folder and make a new one
     sudo( 'rm -rf /home/ubuntu/projects/SecureLogging')
     run( 'mkdir -p /home/ubuntu/projects/SecureLogging')
-    #sudo( 'apt-get update')
+    sudo( 'apt-get update')
     sudo("apt-get install -y sysbench")
     sudo("apt-get install -y python-pip")
     sudo("apt-get install -y python-dev libssl-dev libffi-dev")
@@ -244,7 +254,7 @@ def passcache():
     #Install mongodb
     sudo("apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv EA312927")
     sudo("echo \"deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list")
-    sudo( "apt-get update ")
+    
     sudo("apt-get install -y mongodb-org")
     sudo("sed -i '/bindIp/d' /etc/mongod.conf") 
     sudo("sudo service mongod restart")
@@ -280,18 +290,6 @@ def experiment1():
     env.messages = 2000
     env.expname = "experiment1"
     
-    
-
-    with settings(warn_only=True):            
-        execute(clean)
-    
-    if "rsdir" in env:
-        del env["rsdir"]
-        
-    execute(keys)
-    execute(loaddir)
-    execute(loadsecret)
-        
     local( "rm -rf experiment1" )
     local( "mkdir experiment1" )
     execute( "experiment1run" )
@@ -401,7 +399,7 @@ def experiment3():
         execute(loaddir)
         execute(loadsecret)
 
-        execute( )
+        execute(start)
 
         execute( experiment1run )
         execute( experiment1pre )

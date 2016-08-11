@@ -371,7 +371,7 @@ def decode_json_to_log_entry(jason_dict):
 
 class RSCLogger:
     def __init__(self, ip = "localhost", port=27017):
-        self.client = MongoClient(ip,port)
+        self.client = MongoClient(ip,port, j=True)
         self.db = self.client.RSC_Log_Database
         self.collection = self.db.log_collection
         self.db.collection.create_index([("lampClock", pymongo.ASCENDING)])
@@ -466,15 +466,33 @@ class RSCLogger:
         return hashhead, sig, dataCore
     def query_random_hashhead(self):
         
-        cursor = self.collection.find({"action": "Commit_Success"})
         
-        randomIndex= randint(0, cursor.count()-1)
+        
+        #json_entry = self.collection.find_one({"lampClock":27000})
+        #print json_entry
+        
+        cursor = self.collection.find({"action": "Commit_Success",
+                                       "seqs": { "$exists": True, "$not": {"$size": 0}}
+                                       })
+        print cursor.count()
+        
+        if (cursor.count() == 0):
+            return None
+        if(cursor.count()==1):
+            randomIndex = 0;
+        
+        else:
+            randomIndex= randint(0, cursor.count()-1)
+        
+       
         
         json_entry = cursor[randomIndex]
         
         logEntry = decode_json_to_log_entry(json_entry)
         
         randomIndex_2 = randint(0, len(logEntry.authKeys)-1)
+        
+        
         
         hashhead = logEntry.hashheads[randomIndex_2]
         pub = logEntry.authKeys[randomIndex_2]
@@ -617,15 +635,21 @@ class Auditor:
         return noDoubleSpent
     
     def start_online_audit(self):
-        
+        logDBport = 27017
         all_good = True
         for (kid, ip, port) in self.directory:
             
-            logger = RSCLogger(ip,27017)
-            (hashhead, pub, sig, seqStr, dataCore) = logger.query_random_hashhead()
+            logger = RSCLogger(ip,logDBport)
+            hashhead_bundle = logger.query_random_hashhead()
             
+            if(hashhead_bundle == None):
+                continue;
+            
+            (hashhead, pub, sig, seqStr, dataCore) = hashhead_bundle
+                
             pub_key = rscoin.Key(pub)
             found_audited_mintette = False
+            
             
             for (kid, ip, port) in self.directory:
                 if pub_key.id() == kid:
@@ -641,7 +665,7 @@ class Auditor:
             
             assert pub_key.verify(new_h, sig)
             
-            all_good &= self.audit_log(kid, ip,27017, hashhead, int(seqStr) )
+            all_good &= self.audit_log(kid, ip,logDBport, hashhead, int(seqStr) )
         
         return all_good
                 
