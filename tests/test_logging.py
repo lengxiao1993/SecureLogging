@@ -360,8 +360,81 @@ def test_log_verify(msg_mass):
     assert auditor.audit_logEntry(logEntries[1], factory.directory[0][0])
     
        
-def test_query_then_verify():
+def test_audit_speed(msg_mass):
+    
+    
+    (sometx, mesages_q) = msg_mass
+    (factory, instance, tr) = sometx
+
+    responses = []
+    t0 = timer()
+    for (tx, data, core) in mesages_q:
+        tr.clear()
+        instance.lineReceived(data)
+        response = tr.value()
+        responses += [(tx, data, core, response)]
+    t1 = timer()
+    #print "\nQuery message rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(mesages_q))))
+
+    ## Now we test the Commit
+    t0 = timer()
+    for (tx, data, core, response) in responses:
+        resp = response.split(" ")
+        pub, sig, hashhead, seqStr = map(b64decode, resp[1:])
+        assert resp[0] == "OK"
+        tr.clear()
+        data = package_commit(core, [(pub, sig, hashhead, seqStr)])
+        instance.lineReceived(data)
+        response = tr.value()
+        flag, pub, sig, hashhead, seqStr = unpackage_commit_response(response)
+        assert flag == "OK"
+    t1 = timer()
+    #print "\nCommit message rate: %2.2f / sec" % (1.0 / ((t1-t0)/(len(responses))))
+    
+    
+    ## log verification test
+    t0 = timer()
     logger = RSCLogger()
+    last_queried_tx, data, core = mesages_q[-1]
+    authPub = factory.key.pub.export(EcPt.POINT_CONVERSION_UNCOMPRESSED)
+    seq =  len(mesages_q)
+    
+    quired_hashhead, sig, dataCore = logger.query_hashhead(last_queried_tx.id(), authPub, 
+                                            seq)
+    assert quired_hashhead !=None
+    
+    new_h = sha256(" ".join( dataCore
+                            + [quired_hashhead] 
+                            +[str(seq)])).digest()
+    
+    assert factory.key.verify(new_h, sig)
+    
+    assert logger.verify_log(len(mesages_q), quired_hashhead) == True
+    assert logger.verify_log(int(seqStr), hashhead) == True
+    t1 = timer()
+    
+    ## test hashhead query protocol
+    data = package_hashQuery(last_queried_tx, authPub, str(seq))
+    tr.clear()
+    instance.lineReceived(data)
+    response = tr.value()
+    quired_hashhead, sig, dataCore = unpackage_hash_response(response)
+    assert quired_hashhead !=None
+    
+    new_h = sha256(" ".join( dataCore
+                            + [quired_hashhead] 
+                            +[str(seq)])).digest()
+    
+    assert factory.key.verify(new_h, sig)
+    
+    auditor = Auditor(factory.directory, factory.special_key)
+    
+    t0 = timer() 
+    assert auditor.audit_log(factory.key.id(), "localhost", 27017, factory.get_hash_head(), 2000)
+    t1 = timer()
+    
+    # the seq == the number of entries because there is only one mintette
+    print "\nLog auditing rate: %2.2f / sec" % (1.0 / ((t1-t0)/(seq)))
     
     
     

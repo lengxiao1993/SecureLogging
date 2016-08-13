@@ -18,7 +18,7 @@ if __name__ == "__main__":
     m_r1, v_r1 = [], []
     m_r2, v_r2 = [], []
 
-    for i in range(1, 11):
+    for i in range(1, 30): 
         X += [i]
 
         directory = "experiment3x%03d" % i
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     plt.xlabel('Number of Servers')
     plt.ylabel('Transactions / sec')
     # plt.title(r'Transaction Throughput Scalability')
-    plt.axis([1, 10, 0, 800])
+    plt.axis([0, 30, 0, 2300])
     plt.grid(True)
 
     first_legend = plt.legend(loc="upper left")

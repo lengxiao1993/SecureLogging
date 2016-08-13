@@ -371,10 +371,11 @@ def decode_json_to_log_entry(jason_dict):
 
 class RSCLogger:
     def __init__(self, ip = "localhost", port=27017):
-        self.client = MongoClient(ip,port, j=True)
+        self.client = MongoClient(ip,port)
         self.db = self.client.RSC_Log_Database
         self.collection = self.db.log_collection
         self.db.collection.create_index([("lampClock", pymongo.ASCENDING)])
+        #self.db.collection.create_index([("inputAddrIds", pymongo.ASCENDING)])
     
     def query_total_number(self):   
         cursor = self.collection.find({})
@@ -474,7 +475,7 @@ class RSCLogger:
         cursor = self.collection.find({"action": "Commit_Success",
                                        "seqs": { "$exists": True, "$not": {"$size": 0}}
                                        })
-        print cursor.count()
+        #print cursor.count()
         
         if (cursor.count() == 0):
             return None
@@ -634,6 +635,29 @@ class Auditor:
         
         return noDoubleSpent
     
+    
+    
+    def audit_log(self, pub_id, ip, logDBport, hashhead, seq):
+        self.connect_to_log_db(ip, logDBport)
+        
+        valid_log = True
+        logEntries = self.logger.collection.find({"lampClock":{"$lte":seq}}) \
+                       .sort("lampClock",pymongo.ASCENDING)
+        
+        for json_string in logEntries:
+            logEntry = decode_json_to_log_entry(json_string)
+            if logEntry.lampClock == 1:
+                hash_head = sha256(logEntry.serialize()+"").digest()
+            else:
+                hash_head = sha256(logEntry.serialize()+hash_head).digest()
+                
+            valid_log &= self.audit_logEntry(logEntry, pub_id)
+        
+        valid_log &= (hash_head == hashhead)
+        
+    
+        return valid_log
+    
     def start_online_audit(self):
         logDBport = 27017
         all_good = True
@@ -670,20 +694,7 @@ class Auditor:
         return all_good
                 
                     
-    def audit_log(self, pub_id, ip, logDBport, hashhead, seq):
-        self.connect_to_log_db(ip, logDBport)
-        
-        valid_log = self.logger.verify_log(seq, hashhead)
-        
-        if not valid_log:
-            return False
-        
-        
-        logEnries = self.logger.query_log_by_end_seq(seq)
-        for entry in logEnries:
-            valid_log &= self.audit_logEntry(entry, pub_id)
     
-        return valid_log
             
                     
             

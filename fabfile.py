@@ -31,8 +31,8 @@ def parse_machines(s):
 
 
 all_machines = sorted(get_aws_machines())
-servers = all_machines[:len(all_machines) / 2]
-clients = all_machines[len(all_machines) / 2:]
+servers = all_machines[:30]
+clients = all_machines[30:]
 
 def dyn_server_role():
     if "slimit" not in env:
@@ -55,7 +55,7 @@ env.roledefs.update({
 from collections import defaultdict
 env.timings = defaultdict(list)
 
-NUM_MACHINES = 20
+NUM_MACHINES = 50
 
 @roles("servers")
 def mytask():
@@ -245,13 +245,14 @@ def passcache():
     # Delete old folder and make a new one
     sudo( 'rm -rf /home/ubuntu/projects/SecureLogging')
     run( 'mkdir -p /home/ubuntu/projects/SecureLogging')
-    sudo( 'apt-get update')
+    #sudo( 'apt-get update')
     sudo("apt-get install -y sysbench")
     sudo("apt-get install -y python-pip")
     sudo("apt-get install -y python-dev libssl-dev libffi-dev")
     sudo("apt-get install -y git")
     
-    #Install mongodb
+    # Install mongodb
+    
     sudo("apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv EA312927")
     sudo("echo \"deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list")
     
@@ -374,7 +375,7 @@ def experiment3():
     ## Use 20 clients
     env.climit = 25
 
-    for i in [10, 15, 20, 25, 30]: # range(1, len(servers)+1):
+    for i in range(3,len(servers)): # range(1, len(servers)+1):
 
         env.expname = "experiment3x%03d" % i
         with settings(warn_only=True):
@@ -406,7 +407,8 @@ def experiment3():
 
         execute( experiment1actual )
         execute( experiment1collect )
-
+        
+        execute( deleteLogs)
 
         with settings(warn_only=True):
             execute(stop)
