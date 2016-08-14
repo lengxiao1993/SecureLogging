@@ -14,15 +14,19 @@ from numpy import mean, std
 
 
 def get_times(data):
+    # Return a list composed by tuple( end_time of commit, latency for this commit )
     lst = re.findall("Commit OK \d+[.]\d+ \d+[.]\d+ \d+[.]\d+", data.read())
     lst = map(lambda x: (float(x.split()[4]), float(x.split()[4]) - float(x.split()[3])), lst)
     return lst
 
 
 def process_recs(directory, fname):
+
     data = sorted(get_times(file(join(directory, fname))))
     
     recs = defaultdict(int)
+    
+    # compute the throughput in every second
     for tend, td in data:
         recs[int(tend)] += 1
 

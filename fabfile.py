@@ -31,8 +31,8 @@ def parse_machines(s):
 
 
 all_machines = sorted(get_aws_machines())
-servers = all_machines[:30]
-clients = all_machines[30:]
+servers = all_machines[:len(all_machines) / 2]
+clients = all_machines[len(all_machines) / 2:]
 
 def dyn_server_role():
     if "slimit" not in env:
@@ -55,7 +55,7 @@ env.roledefs.update({
 from collections import defaultdict
 env.timings = defaultdict(list)
 
-NUM_MACHINES = 50
+NUM_MACHINES = 6
 
 @roles("servers")
 def mytask():
@@ -77,8 +77,9 @@ def ec2start():
 def ec2restart():
     instances = ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['stopped']}])
     ids = [i.id for i in instances]
+    
     try:
-        ec2.instances.filter(InstanceIds=ids).start()
+        ec2.instances.filter(InstanceIds=ids[0:NUM_MACHINES]).start()
         #ec2.instances.filter(InstanceIds=ids).terminate()
     except Exception as e:
         print e         
@@ -161,8 +162,8 @@ def start():
 def clean():
     with cd('/home/ubuntu/projects/SecureLogging'):
         run('rm -rf experiment*')
-        run('rm keys-*')
-        run('rm logs-*')
+        run('rm -rf keys-*')
+        run('rm -rf logs-*')
         
 @roles("servers")
 @parallel
@@ -201,6 +202,20 @@ def stop():
             except:
                 pass
             # print out
+            
+@roles("servers", "clients")
+@parallel
+def liststatus():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        with settings(warn_only=True):
+            
+            try:
+                out = run('ps -u ubuntu')
+                if "twistd" in out:
+                    out = run('ps -u ubuntu | grep "twis"')
+                    print out
+            except:
+                pass
             
 
 @roles("servers")
@@ -252,14 +267,14 @@ def passcache():
     sudo("apt-get install -y git")
     
     # Install mongodb
-    
+    """
     sudo("apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv EA312927")
     sudo("echo \"deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.2 multiverse\" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list")
     
     sudo("apt-get install -y mongodb-org")
     sudo("sed -i '/bindIp/d' /etc/mongod.conf") 
     sudo("sudo service mongod restart")
-    
+    """
     with cd('/home/ubuntu/projects'):
         sudo('pip install petlib --upgrade')
         sudo('pip install pymongo')
@@ -373,10 +388,10 @@ def experiment3():
     env.messages = 1000
 
     ## Use 20 clients
-    env.climit = 25
+    env.climit = 20
 
-    for i in range(3,len(servers)): # range(1, len(servers)+1):
-
+    for i in range(11,31,1): # range(1, len(servers)+1):
+        
         env.expname = "experiment3x%03d" % i
         with settings(warn_only=True):
             local( "rm -rf %s" % env.expname )
@@ -393,6 +408,10 @@ def experiment3():
         with settings(warn_only=True):            
             execute(clean)
         
+        with settings(warn_only = True):
+            execute(deleteLogs)
+            
+                
         if "rsdir" in env:
             del env["rsdir"]
             
@@ -415,8 +434,12 @@ def experiment3():
 
         local("python exp1plot.py %s" % env.expname)
         local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
-
-
+        
+@roles("clients")
+@parallel
+def audit():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        run("./rscauditor.py --online_audit")
 
 #@roles("servers")
 #def exp3each():

@@ -18,7 +18,7 @@ if __name__ == "__main__":
     m_r1, v_r1 = [], []
     m_r2, v_r2 = [], []
 
-    for i in range(1, 30): 
+    for i in range(3, 31,3): 
         X += [i]
 
         directory = "experiment3x%03d" % i
