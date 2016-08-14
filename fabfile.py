@@ -439,7 +439,7 @@ def experiment3():
 @parallel
 def audit():
     with cd('/home/ubuntu/projects/SecureLogging'):
-        run("ls -l  ")
+        run("./rscauditor.py --online_audit")
 
 #@roles("servers")
 #def exp3each():
