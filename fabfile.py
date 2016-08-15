@@ -35,9 +35,9 @@ all_machines = sorted(get_aws_machines())
 #clients = all_machines[len(all_machines) / 2:len(all_machines) / 2+1]
 #clients = all_machines[len(all_machines) / 2:]
 
-servers = all_machines[:3]
-clients = all_machines[3:4]
-auditors = all_machines[4:]
+servers = all_machines[:20]
+clients = all_machines[20:35]
+auditors = all_machines[35:50]
 
 def dyn_server_role():
     if "slimit" not in env:
@@ -151,7 +151,7 @@ def gitpull():
     with cd('/home/ubuntu/projects/SecureLogging'):
         run('git pull')
 
-@roles("servers", "clients")
+@roles("servers", "clients", "auditors")
 @parallel
 def gitall():
     with cd('/home/ubuntu/projects/SecureLogging'):
@@ -227,6 +227,25 @@ def stop():
                 pass
             # print out
             
+@roles("auditors")
+@parallel
+def audit():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        out = run("nohup ./rscauditor.py --online_audit & ")
+                    
+         
+@roles("auditors")
+@parallel
+def stopAuditors():
+    #out = run("pgrep -af python | grep audit")
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        out = run("ls -l | grep nohup ")
+        print out
+#        if "rscauditor.py" in out:
+#            pid = out.strip().split()[1]
+#            run('kill %s' % pid)
+
+
 @roles("servers", "clients")
 @parallel
 def liststatus():
@@ -266,20 +285,20 @@ def keys():
     from json import dumps
     file("directory.conf", "w").write(dumps(env["rsdir"]))
 
-@roles("servers","clients")
+@roles("servers","clients", "auditors")
 @parallel
 def loaddir():
     with cd('/home/ubuntu/projects/SecureLogging'):
         put('directory.conf', 'directory.conf')
 
-@roles("clients")
+@roles("clients", "auditors")
 @parallel
 def loadsecret():
     with cd('/home/ubuntu/projects/SecureLogging'):
         put('secret.key', 'secret.key')
 
 
-@roles("servers","clients")
+@roles("servers","clients", "auditors")
 @parallel
 def passcache():
     # Delete old folder and make a new one
@@ -461,52 +480,38 @@ def experiment3():
         local("python exp1plot.py %s" % env.expname)
         local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
 
-@roles("auditors")
-@parallel
-def audit():
-    with cd('/home/ubuntu/projects/SecureLogging'):
-        run("./rscauditor.py --online_audit ")
 
-@roles("auditors")
-@parallel
-def stopAuditors():
-    with cd('/home/ubuntu/projects/SecureLogging'):
-        out = run("pgrep -af python | grep audit")
-#        print out
-#       if "audit" in out:
-#            pid = out.strip().split()[0]
-#            run('kill %s' % pid)
+
+
 
 @runs_once
 def experiment6():
 
     env.messages = 1000
-    env.slimit = 3
+    env.slimit = 20
     ## Use 20 clients
-    env.climit = 1
-    NUM_AUDITORS = 2
+    env.climit = 15
+    NUM_AUDITORS = 1
 
-    for i in range(1, NUM_AUDITORS+1): # range(1, len(servers)+1):
+    env.expname = "experiment6x%03d" % NUM_AUDITORS
+     
+    with settings(warn_only=True):
+        local( "rm -rf %s" % env.expname )
         
-        env.expname = "experiment6x%03d" % i
-        with settings(warn_only=True):
-            local( "rm -rf %s" % env.expname )
-            
-        local( "mkdir %s" % env.expname )
+    local( "mkdir %s" % env.expname )
 
-        with settings(warn_only=True):            
-            execute(clean)
-        
-        execute( audit )    
-        execute( experiment1run )
-        execute( experiment1pre )
+    with settings(warn_only=True):            
+        execute(clean)
+     
+    execute( experiment1run )
+    execute( experiment1pre )
 
-        execute( experiment1actual )
-        execute( experiment1collect )
-        
-        execute( stopAuditors)
-        local("python exp1plot.py %s" % env.expname)
-        local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
+    execute( experiment1actual )
+    execute( experiment1collect )
+    
+    execute( stopAuditors)
+    local("python exp1plot.py %s" % env.expname)
+    local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
         
 
 #@roles("servers")

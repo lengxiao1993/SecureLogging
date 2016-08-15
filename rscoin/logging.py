@@ -518,11 +518,11 @@ class Auditor:
         if logEntry.action == "Commit_Success":
             data = logEntry.get_commit_data()
             res = self.check_commit_action(data, audited_pub_id)
-            print "audit finish "+ logEntry.action + str(logEntry.lampClock)
+            #print "audit finish "+ logEntry.action + str(logEntry.lampClock)
         elif logEntry.action == "Query_Success":
             data = logEntry.get_query_data()
             res = self.check_query_action(data, audited_pub_id)
-            print "audit finish "+ logEntry.action + str(logEntry.lampClock)
+            #print "audit finish "+ logEntry.action + str(logEntry.lampClock)
         return res
     def check_commit_action(self, data, audited_pub_id):
         H, mainTx, otherTx, keys, sigs, auth_pub, auth_sig, hashheads, seqStrs, items \
