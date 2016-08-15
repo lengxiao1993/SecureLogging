@@ -518,10 +518,11 @@ class Auditor:
         if logEntry.action == "Commit_Success":
             data = logEntry.get_commit_data()
             res = self.check_commit_action(data, audited_pub_id)
+            print "audit finish "+ logEntry.action + str(logEntry.lampClock)
         elif logEntry.action == "Query_Success":
             data = logEntry.get_query_data()
             res = self.check_query_action(data, audited_pub_id)
-            
+            print "audit finish "+ logEntry.action + str(logEntry.lampClock)
         return res
     def check_commit_action(self, data, audited_pub_id):
         H, mainTx, otherTx, keys, sigs, auth_pub, auth_sig, hashheads, seqStrs, items \
@@ -643,16 +644,16 @@ class Auditor:
         valid_log = True
         logEntries = self.logger.collection.find({"lampClock":{"$lte":seq}}) \
                        .sort("lampClock",pymongo.ASCENDING)
-        
+         
         for json_string in logEntries:
             logEntry = decode_json_to_log_entry(json_string)
             if logEntry.lampClock == 1:
                 hash_head = sha256(logEntry.serialize()+"").digest()
             else:
+                assert hash_head != None # the if operation must have been executed
                 hash_head = sha256(logEntry.serialize()+hash_head).digest()
                 
             valid_log &= self.audit_logEntry(logEntry, pub_id)
-        
         valid_log &= (hash_head == hashhead)
         
     

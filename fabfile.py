@@ -32,8 +32,8 @@ def parse_machines(s):
 
 all_machines = sorted(get_aws_machines())
 servers = all_machines[:len(all_machines) / 2]
-clients = all_machines[len(all_machines) / 2:]
-
+clients = all_machines[len(all_machines) / 2:len(all_machines) / 2+1]
+#clients = all_machines[len(all_machines) / 2:]
 def dyn_server_role():
     if "slimit" not in env:
         return servers
@@ -170,7 +170,19 @@ def clean():
 def deleteLogs():
     with cd('/home/ubuntu/projects/SecureLogging'):
         run('mongo RSC_Log_Database --eval "db.log_collection.remove({})"')
-        
+
+@roles("servers")
+@parallel
+def checkIndexes():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        run('mongo RSC_Log_Database --eval "db.log_collection.getIndexes()"')
+
+@roles("servers")
+@parallel
+def createIndexes():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        run('mongo RSC_Log_Database --eval "db.log_collection.createIndex({lampClock:1})"')
+        run('mongo RSC_Log_Database --eval "db.log_collection.createIndex({inputAddrIds    :1})"')
 @roles("servers")
 @parallel
 def check():
@@ -221,6 +233,7 @@ def liststatus():
 @roles("servers")
 def keys():
     if "rsdir" not in env:
+        # read from the local file where the fab file resides
         secret = file("secret.key").read()
         public = rscoin.Key(secret, public=False)
         pid = b64encode(public.id())
@@ -283,6 +296,7 @@ def passcache():
 @runs_once
 def init():
     # local("grep rsa ~/.ssh/known_hosts > known_hosts")
+    # This key generaed locally is used as special key
     local("python derivekey.py --store")
     execute(passcache)
 
@@ -434,12 +448,56 @@ def experiment3():
 
         local("python exp1plot.py %s" % env.expname)
         local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
-        
+
 @roles("clients")
 @parallel
 def audit():
     with cd('/home/ubuntu/projects/SecureLogging'):
         run("./rscauditor.py --online_audit")
+
+@runs_once
+def experiment6():
+
+    env.messages = 1000
+    env.slimit = 20
+    ## Use 20 clients
+    env.climit = 15
+    NUM_AUDITORS = 15
+
+    for i in range(1, NUM_AUDITORS): # range(1, len(servers)+1):
+        
+        env.expname = "experiment6x%03d" % i
+        with settings(warn_only=True):
+            local( "rm -rf %s" % env.expname )
+        local( "mkdir %s" % env.expname )
+
+        with settings(warn_only=True):            
+            execute(clean)
+            
+        with settings(warn_only=True):            
+            execute(stop)
+        
+        with settings(warn_only = True):
+            execute(deleteLogs)
+            
+                
+        if "rsdir" in env:
+            del env["rsdir"]
+            
+        execute( experiment1run )
+        execute( experiment1pre )
+
+        execute( experiment1actual )
+        execute( experiment1collect )
+        
+        execute( deleteLogs)
+
+        with settings(warn_only=True):
+            execute(stop)
+
+        local("python exp1plot.py %s" % env.expname)
+        local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
+        
 
 #@roles("servers")
 #def exp3each():
