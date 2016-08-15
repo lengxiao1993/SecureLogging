@@ -465,17 +465,17 @@ def experiment3():
 @parallel
 def audit():
     with cd('/home/ubuntu/projects/SecureLogging'):
-        run("./rscauditor.py --online_audit &")
+        run("./rscauditor.py --online_audit ")
 
 @roles("auditors")
 @parallel
 def stopAuditors():
     with cd('/home/ubuntu/projects/SecureLogging'):
         out = run("pgrep -af python | grep audit")
-        if "rscauditor" in out:
-            pid = out.strip().split()[0]
-            run('kill %s' % pid)
-        
+#        print out
+#       if "audit" in out:
+#            pid = out.strip().split()[0]
+#            run('kill %s' % pid)
 
 @runs_once
 def experiment6():
