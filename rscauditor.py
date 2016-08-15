@@ -1,28 +1,13 @@
 #!/usr/bin/python
-from base64 import b64encode, b64decode
-from binascii import hexlify
 
-from hashlib import sha256
-import os.path
-from os import urandom
-from timeit import default_timer as timer
-from collections import defaultdict
-from traceback import print_stack, print_exc
-from twisted.test.proto_helpers import StringTransport
 
 import rscoin
 from rscoin.rscservice import RSCFactory, load_setup, get_authorities,\
     unpackage_hash_response, package_hashQuery
-from rscoin.rscservice import package_query, unpackage_query_response, \
-                        package_commit, package_issue, unpackage_commit_response, \
-                        RSCProtocol
 from tests.test_rscservice import sometx, msg_mass
 from rscoin.logging import RSCLogEntry, RSCLogger, decode_json_to_log_entry, \
                            encode_log_entry_to_json, Auditor
-from py._path.svnwc import LogEntry
-                        
-from petlib.ec import EcPt
-
+import thread
 import argparse
 import socket
 
@@ -39,8 +24,19 @@ def main():
     args = parser.parse_args()
     
     if args.online_audit:
-        auditor = Auditor(directory, special_id)
-        assert auditor.start_online_audit()
+        # Create two threads as follows
+        threadNum = 30
+        for _ in range(threadNum):
+            auditor = Auditor(directory, special_id)
+            
+            try:
+                thread.start_new_thread( auditor.start_online_audit,())
+            except Exception, e:
+                print "Error: unable to start thread %s" % e
+            
+            while 1:
+                pass        
+        
     
     if args.local_test:
         secret = "A" * 32

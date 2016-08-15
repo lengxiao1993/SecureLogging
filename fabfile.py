@@ -31,9 +31,14 @@ def parse_machines(s):
 
 
 all_machines = sorted(get_aws_machines())
-servers = all_machines[:len(all_machines) / 2]
-clients = all_machines[len(all_machines) / 2:len(all_machines) / 2+1]
+#servers = all_machines[:len(all_machines) / 2]
+#clients = all_machines[len(all_machines) / 2:len(all_machines) / 2+1]
 #clients = all_machines[len(all_machines) / 2:]
+
+servers = all_machines[:3]
+clients = all_machines[3:4]
+auditors = all_machines[4:]
+
 def dyn_server_role():
     if "slimit" not in env:
         return servers
@@ -45,11 +50,18 @@ def dyn_client_role():
         return clients
     else:
         return clients[:env.climit]
+    
+def dyn_auditor_role():
+    if "alimit" not in env:
+        return auditors
+    else:
+        return auditors[:env.alimit]
 
 
 env.roledefs.update({
     'servers': dyn_server_role, #servers,
-    'clients': dyn_client_role
+    'clients': dyn_client_role,
+    'auditors': dyn_auditor_role
 })
 
 from collections import defaultdict
@@ -449,52 +461,50 @@ def experiment3():
         local("python exp1plot.py %s" % env.expname)
         local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
 
-@roles("clients")
+@roles("auditors")
 @parallel
 def audit():
     with cd('/home/ubuntu/projects/SecureLogging'):
-        run("./rscauditor.py --online_audit")
+        run("./rscauditor.py --online_audit &")
+
+@roles("auditors")
+@parallel
+def stopAuditors():
+    with cd('/home/ubuntu/projects/SecureLogging'):
+        out = run("pgrep -af python | grep audit")
+        if "rscauditor" in out:
+            pid = out.strip().split()[0]
+            run('kill %s' % pid)
+        
 
 @runs_once
 def experiment6():
 
     env.messages = 1000
-    env.slimit = 20
+    env.slimit = 3
     ## Use 20 clients
-    env.climit = 15
-    NUM_AUDITORS = 15
+    env.climit = 1
+    NUM_AUDITORS = 2
 
-    for i in range(1, NUM_AUDITORS): # range(1, len(servers)+1):
+    for i in range(1, NUM_AUDITORS+1): # range(1, len(servers)+1):
         
         env.expname = "experiment6x%03d" % i
         with settings(warn_only=True):
             local( "rm -rf %s" % env.expname )
+            
         local( "mkdir %s" % env.expname )
 
         with settings(warn_only=True):            
             execute(clean)
-            
-        with settings(warn_only=True):            
-            execute(stop)
         
-        with settings(warn_only = True):
-            execute(deleteLogs)
-            
-                
-        if "rsdir" in env:
-            del env["rsdir"]
-            
+        execute( audit )    
         execute( experiment1run )
         execute( experiment1pre )
 
         execute( experiment1actual )
         execute( experiment1collect )
         
-        execute( deleteLogs)
-
-        with settings(warn_only=True):
-            execute(stop)
-
+        execute( stopAuditors)
         local("python exp1plot.py %s" % env.expname)
         local("python estthroughput.py %s > %s/stats.txt" % (env.expname, env.expname))
         

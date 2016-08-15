@@ -662,36 +662,38 @@ class Auditor:
     def start_online_audit(self):
         logDBport = 27017
         all_good = True
-        for (kid, ip, port) in self.directory:
-            
-            logger = RSCLogger(ip,logDBport)
-            hashhead_bundle = logger.query_random_hashhead()
-            
-            if(hashhead_bundle == None):
-                continue;
-            
-            (hashhead, pub, sig, seqStr, dataCore) = hashhead_bundle
-                
-            pub_key = rscoin.Key(pub)
-            found_audited_mintette = False
-            
-            
-            for (kid, ip, port) in self.directory:
-                if pub_key.id() == kid:
-                    found_audited_mintette = True
-                    break
-                
-            if not found_audited_mintette:
-                return False
-            
-            new_h = sha256(" ".join( dataCore
-                    + [hashhead] 
-                    +[seqStr])).digest()
-            
-            assert pub_key.verify(new_h, sig)
-            
-            all_good &= self.audit_log(kid, ip,logDBport, hashhead, int(seqStr) )
         
+        while(True):
+            for (kid, ip, port) in self.directory:
+                
+                logger = RSCLogger(ip,logDBport)
+                hashhead_bundle = logger.query_random_hashhead()
+                
+                if(hashhead_bundle == None):
+                    continue;
+                
+                (hashhead, pub, sig, seqStr, dataCore) = hashhead_bundle
+                    
+                pub_key = rscoin.Key(pub)
+                found_audited_mintette = False
+                
+                
+                for (kid, ip, port) in self.directory:
+                    if pub_key.id() == kid:
+                        found_audited_mintette = True
+                        break
+                    
+                if not found_audited_mintette:
+                    return False
+                
+                new_h = sha256(" ".join( dataCore
+                        + [hashhead] 
+                        +[seqStr])).digest()
+                
+                assert pub_key.verify(new_h, sig)
+                
+                all_good &= self.audit_log(kid, ip,logDBport, hashhead, int(seqStr) )
+            
         return all_good
                 
                     
