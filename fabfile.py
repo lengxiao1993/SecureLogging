@@ -35,9 +35,9 @@ all_machines = sorted(get_aws_machines())
 #clients = all_machines[len(all_machines) / 2:len(all_machines) / 2+1]
 #clients = all_machines[len(all_machines) / 2:]
 
-servers = all_machines[:20]
-clients = all_machines[20:35]
-auditors = all_machines[35:50]
+servers = all_machines[:30]
+clients = all_machines[30:50]
+auditors = all_machines[50:50]
 
 def dyn_server_role():
     if "slimit" not in env:
@@ -284,6 +284,7 @@ def keys():
 
     from json import dumps
     file("directory.conf", "w").write(dumps(env["rsdir"]))
+    
 
 @roles("servers","clients", "auditors")
 @parallel
@@ -345,7 +346,7 @@ def deploy():
     execute(keys)
     execute(loaddir)
     execute(loadsecret)
-
+    
 @runs_once
 def experiment1():
     env.messages = 2000

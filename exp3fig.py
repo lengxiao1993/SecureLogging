@@ -18,10 +18,10 @@ if __name__ == "__main__":
     m_r1, v_r1 = [], []
     m_r2, v_r2 = [], []
 
-    for i in range(3, 31,3): 
+    for i in range(3, 31,1): 
         X += [i]
 
-        directory = "experiment3x%03d" % i
+        directory = "experiment3xy%03d" % i
         cnt_issue, m, v = process_recs(directory, "issue-times.txt" )
         m_issue += [m]
         v_issue += [v]
